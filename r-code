@@ -1,0 +1,166 @@
+#R code
+
+install.packages("readxl")
+install.packages("survival")
+install.packages("survminer")
+
+library(readxl)
+library(survival)
+library(survminer)
+library(gridExtra)
+
+
+# Survival data einlesen: Overall survival
+daten <- read_excel("D:\\os.xlsx")
+surv_daten <- Surv(daten$OS, daten$"OS censor")
+
+# Kaplan-Meier-Modell erstellen
+km_fit <- survfit(surv_daten ~ 1)
+
+# Kaplan-Meier Plot
+os <- 
+ggsurvplot(km_fit, break.time.by = 3, palette = c("darkgreen"), break.y.by = 0.2,
+           data = daten,          # Die Daten
+           conf.int = TRUE,       # Zeigt das Konfidenzintervall
+           risk.table = TRUE,     # Zeigt die "Number at Risk"-Tabelle
+           xlab = "time, months",         # Beschriftung der X-Achse
+           ylab = "overall survival",  # Beschriftung der Y-Achse
+           legend.title = "",   # Titel der Legende
+           legend.labs = c("all patients"))   # Legendenbeschriftung
+
+
+# Kaplan Meier Plot als PNG speichern
+combined_plot <- grid.arrange(os$plot, os$table, ncol = 1, heights = c(3, 1))
+ggsave("OS all.png", plot = combined_plot, width = 10, height = 8)
+
+
+# Landmark OS Analyse
+summary(km_fit, times = 6)   # Zeit in Monaten
+summary(km_fit, times = 12)   # Zeit in Monaten
+
+
+
+
+#Subgroup Analysis
+
+#Subgroup Charlson comorbidity index
+kmOSCharlson <- survfit(surv_daten ~ daten$CHARLSON)
+
+medians <- summary(kmOSCharlson)$table[, c("median", "0.95LCL", "0.95UCL")] 
+
+km1 <- 
+ggsurvplot(kmOSCharlson, 
+data = daten,
+pval = TRUE,
+conf.int = FALSE,
+risk.table = TRUE,
+break.time.by = 3, 
+xlab = "time, months",   
+ylab = "overall survival",  
+break.y.by = 0.2,
+legend.title = "",
+legend.labs = c("CCI high", "CCI low")
+)   
+
+
+combined_plot <- grid.arrange(km1$plot, km1$table, ncol = 1, heights = c(3, 1))
+ggsave("OS Charlson.png", plot = combined_plot, width = 10, height = 8)
+
+
+
+#Subgroup ECOG Performance status
+kmOSECOG <- survfit(surv_daten ~ daten$ECOG)
+
+medians <- summary(kmOSECOG)$table[, c("median", "0.95LCL", "0.95UCL")] 
+
+km2 <- 
+ggsurvplot(kmOSECOG, 
+data = daten,
+pval = TRUE,
+conf.int = FALSE,
+risk.table = TRUE,
+break.time.by = 3, 
+xlab = "time, months",   
+ylab = "overall survival",  
+break.y.by = 0.2,
+legend.title = "",
+legend.labs = c("ECOG 0-1", "ECOG 2", "ECOG 3")
+)   
+
+combined_plot <- grid.arrange(km2$plot, km2$table, ncol = 1, heights = c(3, 1))
+ggsave("OS ECOG.png", plot = combined_plot, width = 10, height = 8)
+
+
+
+
+
+
+
+
+# Survival data einlesen: Progression free survival
+daten <- read_excel("D:\\pfs.xlsx")
+surv_daten <- Surv(daten$PFS, daten$"PFS censor")
+
+# Kaplan-Meier-Modell erstellen
+km_fit <- survfit(surv_daten ~ 1)
+
+pfs <- 
+ggsurvplot(km_fit, break.time.by = 3, palette = c("darkgreen"), break.y.by = 0.2,
+           data = daten,          # Deine Daten
+           conf.int = TRUE,       # Zeigt das Konfidenzintervall
+           risk.table = TRUE,     # Zeigt die "Number at Risk"-Tabelle
+           xlab = "time, months",         # Beschriftung der X-Achse
+           ylab = "progression free survival",  # Beschriftung der Y-Achse
+           legend.title = "",   # Titel der Legende
+           legend.labs = c("all patients"))   # Legendenbeschriftung
+
+
+combined_plot <- grid.arrange(pfs$plot, pfs$table, ncol = 1, heights = c(3, 1))
+ggsave("PFS all.png", plot = combined_plot, width = 10, height = 8)
+
+
+
+#Subgroup Analysis
+
+#Subgroup Charlson comorbidity index
+kmPFSCharlson <- survfit(surv_daten ~ daten$CHARLSON)
+summary(kmPFSCharlson)$table[, c("median", "0.95LCL", "0.95UCL")] 
+
+km1 <- 
+ggsurvplot(kmPFSCharlson, 
+data = daten,
+pval = TRUE,
+conf.int = FALSE,
+risk.table = TRUE,
+break.time.by = 3, 
+xlab = "time, months",   
+ylab = "progression free survival",  
+break.y.by = 0.2,
+legend.title = "",
+legend.labs = c("CCI high", "CCI low")
+)   
+
+combined_plot <- grid.arrange(km1$plot, km1$table, ncol = 1, heights = c(3, 1))
+ggsave("PFS Charlson.png", plot = combined_plot, width = 10, height = 8)
+
+
+
+#Subgroup ECOG Performance status
+kmPFSECOG <- survfit(surv_daten ~ daten$ECOG)
+
+km2 <- 
+ggsurvplot(kmPFSECOG, 
+data = daten,
+pval = TRUE,
+conf.int = FALSE,
+risk.table = TRUE,
+break.time.by = 3, 
+xlab = "time, months",   
+ylab = "progression free survival",  
+break.y.by = 0.2,
+legend.title = "",
+legend.labs = c("ECOG 0-1", "ECOG 2", "ECOG 3")
+)   
+
+combined_plot <- grid.arrange(km2$plot, km2$table, ncol = 1, heights = c(3, 1))
+ggsave("PFS ECOG.png", plot = combined_plot, width = 10, height = 8)
