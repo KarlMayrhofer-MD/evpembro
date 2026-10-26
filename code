@@ -1,0 +1,663 @@
+
+library(readxl)
+library(survival)
+library(survminer)
+library(gridExtra)
+library(extrafont)
+loadfonts(device = "win") 
+library(showtext)
+library(ragg)
+library(svglite)
+library(dplyr)
+library(purrr)
+library(writexl)
+
+#Dateiverzeichnis lokal
+setwd("D:/....")
+
+
+
+# EV / P Duration of therapy
+
+daten <- read_excel(file.path(getwd(), "evpduration.xlsx"))
+surv_daten <- Surv(daten$ev, daten$"evcensor")
+kmev <- survfit(surv_daten ~ 1)
+summary(kmev)$table
+
+survpem <- Surv(daten$p, daten$"pcensor")
+kmpembro <- survfit(survpem ~ 1)
+summary(kmpembro)$table
+
+
+
+
+# OS
+
+daten <- read_excel(file.path(getwd(), "OS.xlsx"))
+surv_daten <- Surv(daten$OS, daten$"OS censor")
+
+# Kaplan-Meier-Modell erstellen
+km_fit <- survfit(surv_daten ~ 1)
+
+# median mit 95% CI
+summary(km_fit)$table
+
+#medianes follow up
+followup_fit <- survfit(Surv(OS, 1 - `OS censor`) ~ 1, data = daten)
+summary(followup_fit)$table
+
+
+os <- 
+ggsurvplot(km_fit, break.time.by = 3, palette = c("darkgreen"), break.y.by = 0.2,
+           data = daten,          # Deine Daten
+           conf.int = TRUE,       # Zeigt das Konfidenzintervall
+           risk.table = TRUE,     # Zeigt die "Number at Risk"-Tabelle
+           xlab = "time, months",         # Beschriftung der X-Achse
+           ylab = "overall survival",  # Beschriftung der Y-Achse
+           legend.title = "",   # Titel der Legende
+           legend.labs = c("all patients"))   # Legendenbeschriftung
+
+
+# Apply Arial font to both parts
+#os$plot  <- os$plot  + theme(text = element_text(family = "Helvetica"))
+#os$table <- os$table + theme(text = element_text(family = "Helvetica"))
+
+combined_plot <- grid.arrange(os$plot, os$table, ncol = 1, heights = c(3, 1))
+ggsave("OS all.png", plot = combined_plot, width = 10, height = 8, device = ragg::agg_png)
+ggsave("OS all.svg", plot = combined_plot, width = 10, height = 8, device = "svg")
+ggsave("OS all.pdf", plot = combined_plot, width = 10, height = 8, device = cairo_pdf)
+
+
+
+
+
+
+# PFS
+
+daten <- read_excel(file.path(getwd(), "PFS.xlsx"))
+
+surv_daten <- Surv(daten$PFS, daten$"PFS censor")
+
+
+# Kaplan-Meier-Modell erstellen
+km_fit <- survfit(surv_daten ~ 1)
+
+summary(km_fit)$table
+
+pfs <- 
+ggsurvplot(km_fit, break.time.by = 3, palette = c("darkgreen"), break.y.by = 0.2,
+           data = daten,          # Deine Daten
+           conf.int = TRUE,       # Zeigt das Konfidenzintervall
+           risk.table = TRUE,     # Zeigt die "Number at Risk"-Tabelle
+           xlab = "time, months",         # Beschriftung der X-Achse
+           ylab = "progression free survival",  # Beschriftung der Y-Achse
+           legend.title = "",   # Titel der Legende
+           legend.labs = c("all patients"))   # Legendenbeschriftung
+
+
+# Apply Arial font to both parts
+pfs$plot  <- pfs$plot  + theme(text = element_text(family = "Helvetica"))
+pfs$table <- pfs$table + theme(text = element_text(family = "Helvetica"))
+
+
+combined_plot <- grid.arrange(pfs$plot, pfs$table, ncol = 1, heights = c(3, 1))
+ggsave("PFS all.png", plot = combined_plot, width = 10, height = 8, device = ragg::agg_png)
+ggsave("PFS all.svg", plot = combined_plot, width = 10, height = 8, device = "svg")
+ggsave("PFS all.pdf", plot = combined_plot, width = 10, height = 8, device = cairo_pdf)
+
+
+
+
+#HER2 Subgroup
+
+daten <- read_excel(file.path(getwd(), "subgroup.xlsx"))
+
+#Objekte erstellen speichern
+survdatenOS <- Surv(daten$OS, daten$"OS censor")
+survdatenPFS <- Surv(daten$PFS, daten$"PFS censor")
+
+# Kaplan-Meier Kurven
+OSHER2  <- survfit(survdatenOS ~ HER2, data = daten)
+PFSHER2 <- survfit(survdatenPFS ~ HER2, data = daten)
+
+#Median ausgeben
+summary(OSHER2)$table
+surv_pvalue(OSHER2)
+summary(PFSHER2)$table
+surv_pvalue(PFSHER2)
+
+
+
+
+
+# Kaplan-Meier Grafik 
+km <- ggsurvplot(
+  OSHER2, 
+  data = daten,
+  pval = TRUE,
+  conf.int = FALSE,
+  risk.table = TRUE,
+  break.time.by = 3, 
+  xlab = "time, months",   
+  ylab = "Overall survival",  
+  break.y.by = 0.2,
+  legend.title = ""
+)
+# Kurve in R anzeigen
+km$plot 
+
+combined_plot <- grid.arrange(km$plot, km$table, ncol = 1, heights = c(3, 1))
+ggsave("OS HER2.png", plot = combined_plot, width = 10, height = 8, device = ragg::agg_png)
+ggsave("OS HER2.svg", plot = combined_plot, width = 10, height = 8, device = "svg")
+ggsave("OS HER2.pdf", plot = combined_plot, width = 10, height = 8, device = cairo_pdf)
+
+
+# Kaplan-Meier Grafik 
+km <- ggsurvplot(
+  PFSHER2, 
+  data = daten,
+  pval = TRUE,
+  conf.int = FALSE,
+  risk.table = TRUE,
+  break.time.by = 3, 
+  xlab = "time, months",   
+  ylab = "Progression free survival",  
+  break.y.by = 0.2,
+  legend.title = "",
+  legend.labs = c("HER2: 0-1", "HER2: 2+", "HER2: 3+", "NGS ERBB2")
+)
+
+combined_plot <- grid.arrange(km$plot, km$table, ncol = 1, heights = c(3, 1))
+ggsave("PFS HER2.png", plot = combined_plot, width = 10, height = 8, device = ragg::agg_png)
+ggsave("PFS HER2.svg", plot = combined_plot, width = 10, height = 8, device = "svg")
+ggsave("PFS HER2.pdf", plot = combined_plot, width = 10, height = 8, device = cairo_pdf)
+
+
+
+# Cox-Regression zur Berechnung von Hazard Ratio (HR), 95% CI und p-Werten
+cox_OS <- coxph(survdatenOS ~ HER2, data = daten)
+summary(cox_OS)
+cox_PFS <- coxph(survdatenPFS ~ HER2, data = daten)
+summary(cox_PFS)
+
+# Funktion zur Extraktion von HR, 95% CI und p-Wert aus dem Cox-Modell
+get_cox_results <- function(cox_model, endpoint_name) {
+  sum_cox <- summary(cox_model)
+  
+  res <- data.frame(
+    Endpoint   = endpoint_name,
+    Subgroup   = gsub("HER2", "", rownames(sum_cox$coefficients)),
+    HR         = round(sum_cox$coefficients[, "exp(coef)"], 2),
+    CI_lower   = round(sum_cox$conf.int[, "lower .95"], 2),
+    CI_upper   = round(sum_cox$conf.int[, "upper .95"], 2),
+    p_value    = round(sum_cox$coefficients[, "Pr(>|z|)"], 4)
+  ) %>%
+    mutate(
+      `HR (95% CI)` = paste0(HR, " (", CI_lower, "–", CI_upper, ")")
+    ) %>%
+    select(Endpoint, Subgroup, `HR (95% CI)`, p_value)
+  
+  return(res)
+}
+
+# Ergebnistabellen generieren & anzeigen
+results_OS  <- get_cox_results(cox_OS, "OS")
+results_PFS <- get_cox_results(cox_PFS, "PFS")
+final_results <- rbind(results_OS, results_PFS)
+print(final_results)
+
+
+
+
+
+#HER2 Responsedaten auswerten
+
+#Daten einlesen
+dat_raw <- read_excel(file.path(getwd(), "response.xlsx"))
+group_col <- "HER2 Status"
+response_col <- "Response"
+
+
+dat <- dat_raw %>%
+  transmute(
+    biomarker_group = trimws(as.character(.data[[group_col]])),
+    response = toupper(trimws(as.character(.data[[response_col]])))
+  )
+
+group_levels <- c("0-1", "2", "3", "NGS", "unknown")
+reference_group <- "0-1"
+
+known_responses <- c("CR", "PR", "SD", "PD", "NE", "pending")
+
+unknown_responses <- setdiff(
+  unique(na.omit(dat$response)),
+  known_responses
+)
+
+if (length(unknown_responses) > 0) {
+  stop(
+    "Unbekannte Response-Kategorien gefunden: ",
+    paste(unknown_responses, collapse = ", ")
+  )
+}
+
+if (!reference_group %in% group_levels) {
+  stop("Referenzsubgruppe ist nicht in group_levels enthalten.")
+}
+
+n_initial <- nrow(dat)
+
+# Nur pending wird ausgeschlossen. NE bleibt in der Analyse und gilt als Non-Responder.
+dat_eval <- dat %>%
+  filter(
+    !is.na(biomarker_group),
+    biomarker_group %in% group_levels,
+    !is.na(response),
+    response != "",
+    response != "pending"
+  ) %>%
+  mutate(
+    biomarker_group = factor(
+      biomarker_group,
+      levels = group_levels
+    )
+  )
+
+cat("Patienten in der Excel-Datei:", n_initial, "\n")
+cat("Patienten in der Analyse:", nrow(dat_eval), "\n")
+cat(
+  "Ausgeschlossen (pending, fehlende Response oder Subgruppe):",
+  n_initial - nrow(dat_eval), "\n"
+)
+
+cat("\nResponse-Verteilung in der Analyse:\n")
+print(table(dat_eval$response, useNA = "ifany"))
+
+cat("\nFallzahlen pro Biomarker-Subgruppe:\n")
+print(table(dat_eval$biomarker_group, useNA = "ifany"))
+
+
+
+# Endpunkte definieren
+
+# NE gilt bei allen drei Endpunkten als Non-Responder.
+dat_eval <- dat_eval %>%
+  mutate(
+    ORR = response %in% c("CR", "PR"),
+    CRR = response == "CR",
+    DCR = response %in% c("CR", "PR", "SD")
+  )
+
+endpoint_names <- c(
+  ORR = "Objective Response Rate",
+  CRR = "Complete Response Rate",
+  DCR = "Disease Control Rate"
+)
+
+
+# Deskriptive Auswertung mit exaktem 95%-KI Clopper-Pearson
+
+calc_rate <- function(data, endpoint, endpoint_label) {
+
+  data %>%
+    group_by(biomarker_group, .drop = FALSE) %>%
+    summarise(
+      N = n(),
+      Responders = sum(.data[[endpoint]]),
+      .groups = "drop"
+    ) %>%
+    rowwise() %>%
+    mutate(
+      Rate = if (N > 0) Responders / N else NA_real_,
+
+      CI_lower = if (N > 0) {
+        binom.test(Responders, N)$conf.int[1]
+      } else {
+        NA_real_
+      },
+
+      CI_upper = if (N > 0) {
+        binom.test(Responders, N)$conf.int[2]
+      } else {
+        NA_real_
+      },
+
+      Endpoint = endpoint_label
+    ) %>%
+    ungroup() %>%
+    mutate(
+      Rate_pct = 100 * Rate,
+      CI_lower_pct = 100 * CI_lower,
+      CI_upper_pct = 100 * CI_upper,
+      Rate_with_95_CI = ifelse(
+        is.na(Rate),
+        NA_character_,
+        sprintf(
+          "%.1f%% (%.1f–%.1f%%)",
+          Rate_pct, CI_lower_pct, CI_upper_pct
+        )
+      )
+    ) %>%
+    select(
+      Endpoint, biomarker_group, N, Responders,
+      Rate_pct, CI_lower_pct, CI_upper_pct,
+      Rate_with_95_CI
+    )
+}
+
+descriptive_results <- imap_dfr(
+  endpoint_names,
+  ~ calc_rate(dat_eval, .y, .x)
+)
+
+print(descriptive_results)
+
+
+# Gesamtvergleich aller fünf Subgruppen
+
+global_test <- function(data, endpoint) {
+
+  tab <- table(
+    factor(data$biomarker_group, levels = group_levels),
+    factor(data[[endpoint]], levels = c(FALSE, TRUE))
+  )
+
+  # Leere Subgruppen und leere Response-Spalten entfernen
+  tab <- tab[
+    rowSums(tab) > 0,
+    colSums(tab) > 0,
+    drop = FALSE
+  ]
+
+  if (nrow(tab) < 2 || ncol(tab) < 2) {
+    return(tibble(
+      Test = "Nicht berechenbar",
+      Statistic = NA_real_,
+      P_value = NA_real_
+    ))
+  }
+
+  chi <- suppressWarnings(
+    chisq.test(tab, correct = FALSE)
+  )
+
+  if (any(chi$expected < 5)) {
+
+    # Exakter Fisher-Freeman-Halton-Test mit Monte-Carlo-
+    # Approximation für die 5 x 2-Tabelle
+    ft <- fisher.test(
+      tab,
+      simulate.p.value = TRUE,
+      B = 100000
+    )
+
+    tibble(
+      Test = "Fisher-Exact-Test (Monte Carlo)",
+      Statistic = NA_real_,
+      P_value = ft$p.value
+    )
+
+  } else {
+
+    tibble(
+      Test = "Chi-Quadrat-Test",
+      Statistic = unname(chi$statistic),
+      P_value = chi$p.value
+    )
+  }
+}
+
+global_results <- imap_dfr(
+  endpoint_names,
+  function(label, endpoint) {
+    global_test(dat_eval, endpoint) %>%
+      mutate(Endpoint = label, .before = 1)
+  }
+)
+
+print(global_results)
+
+
+
+# Funktion für Referenzvergleiche definieren
+
+
+
+reference_comparison <- function(data, endpoint, endpoint_label) {
+
+  groups_to_compare <- setdiff(group_levels, reference_group)
+
+  purrr::map_dfr(groups_to_compare, function(g) {
+
+    d <- data %>%
+      dplyr::filter(
+        as.character(biomarker_group) %in%
+          c(reference_group, g)
+      )
+
+    n_g <- sum(as.character(d$biomarker_group) == g)
+    r_g <- sum(
+      as.character(d$biomarker_group) == g &
+        d[[endpoint]]
+    )
+
+    n_ref <- sum(
+      as.character(d$biomarker_group) == reference_group
+    )
+    r_ref <- sum(
+      as.character(d$biomarker_group) == reference_group &
+        d[[endpoint]]
+    )
+
+    if (n_g == 0 || n_ref == 0) {
+      return(tibble::tibble(
+        Endpoint = endpoint_label,
+        Subgruppe = g,
+        Referenz = reference_group,
+        N_Subgruppe = n_g,
+        Responder_Subgruppe = r_g,
+        N_Referenz = n_ref,
+        Responder_Referenz = r_ref,
+        OR = NA_real_,
+        CI_lower = NA_real_,
+        CI_upper = NA_real_,
+        P_value = NA_real_
+      ))
+    }
+
+    # Spalten: Vergleichsgruppe und Referenz
+    # Zeilen: Responder und Non-Responder
+    tab <- matrix(
+      c(
+        r_g, n_g - r_g,
+        r_ref, n_ref - r_ref
+      ),
+      nrow = 2,
+      dimnames = list(
+        Response = c("Ja", "Nein"),
+        Gruppe = c(g, reference_group)
+      )
+    )
+
+    ft <- stats::fisher.test(tab)
+
+    tibble::tibble(
+      Endpoint = endpoint_label,
+      Subgruppe = g,
+      Referenz = reference_group,
+      N_Subgruppe = n_g,
+      Responder_Subgruppe = r_g,
+      N_Referenz = n_ref,
+      Responder_Referenz = r_ref,
+      OR = unname(ft$estimate),
+      CI_lower = ft$conf.int[1],
+      CI_upper = ft$conf.int[2],
+      P_value = ft$p.value
+    )
+  })
+}
+
+# Funktion auf alle drei Endpunkte anwenden
+
+reference_results <- purrr::imap_dfr(
+  endpoint_names,
+  function(label, endpoint) {
+    reference_comparison(
+      data = dat_eval,
+      endpoint = endpoint,
+      endpoint_label = label
+    )
+  }
+) %>%
+  dplyr::group_by(Endpoint) %>%
+  dplyr::mutate(
+    P_adjusted_Holm = p.adjust(P_value, method = "holm")
+  ) %>%
+  dplyr::ungroup()
+
+# Ergebnisse anzeigen
+print(reference_results)
+
+
+# Gesamtkohorten-Analyse (Alle Patienten gesamt)
+# ORR, CRR, DCR mit 95%-Konfidenzintervallen (Clopper-Pearson)
+# Ausschluss von "pending"
+
+
+# 1. Daten für die Gesamtanalyse aufbereiten (Pending ausschließen)
+dat_overall_eval <- dat %>%
+  filter(
+    !is.na(response),
+    response != "",
+    response != "pending"
+  ) %>%
+  mutate(
+    ORR = response %in% c("CR", "PR"),
+    CRR = response == "CR",
+    DCR = response %in% c("CR", "PR", "SD")
+  )
+
+# Endpunkte definieren
+endpoint_names <- c(
+  ORR = "Objective Response Rate",
+  CRR = "Complete Response Rate",
+  DCR = "Disease Control Rate"
+)
+
+# 2. Funktion zur Berechnung der Gesamtrate mit exaktem 95%-KI
+calc_overall_rate <- function(data, endpoint, endpoint_label) {
+  N <- nrow(data)
+  Responders <- sum(data[[endpoint]], na.rm = TRUE)
+  
+  rate <- if (N > 0) Responders / N else NA_real_
+  
+  ci <- if (N > 0) {
+    binom.test(Responders, N)$conf.int
+  } else {
+    c(NA_real_, NA_real_)
+  }
+  
+  tibble(
+    Endpoint = endpoint_label,
+    N = N,
+    Responders = Responders,
+    Rate_pct = 100 * rate,
+    CI_lower_pct = 100 * ci[1],
+    CI_upper_pct = 100 * ci[2],
+    Rate_with_95_CI = if (is.na(rate)) {
+      NA_character_
+    } else {
+      sprintf("%.1f%% (%.1f–%.1f%%)", 100 * rate, 100 * ci[1], 100 * ci[2])
+    }
+  )
+}
+
+# Funktion auf alle Endpunkte anwenden
+overall_results <- imap_dfr(
+  endpoint_names,
+  ~ calc_overall_rate(dat_overall_eval, .y, .x)
+)
+
+# Ergebnisse in der Konsole anzeigen
+print(overall_results)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# TDXD Daten
+
+daten1 <- read_excel(file.path(getwd(), "tdxd.xlsx"))
+
+#Objekte erstellen speichern
+survdatentd <- Surv(daten1$OS, daten1$"censor")
+
+# Kaplan-Meier-Modell erstellen
+kmtd <- survfit(survdatentd ~ 1)
+
+# median mit 95% CI
+summary(kmtd)$table
+
+
+
+#medianes follow up
+followup_fit <- survfit(Surv(OS, 1 - `censor`) ~ 1, data = daten1)
+summary(followup_fit)$table
+
+
+
+
+os <- 
+ggsurvplot(kmtd, break.time.by = 3, palette = c("darkgreen"), break.y.by = 0.2,
+           data = daten1,          # Deine Daten
+           conf.int = TRUE,       # Zeigt das Konfidenzintervall
+           risk.table = TRUE,     # Zeigt die "Number at Risk"-Tabelle
+           xlab = "time, months",         # Beschriftung der X-Achse
+           ylab = "overall survival",  # Beschriftung der Y-Achse
+           legend.title = "",   # Titel der Legende
+           legend.labs = c("all patients"))   # Legendenbeschriftung
+
+combined_plot <- grid.arrange(os$plot, os$table, ncol = 1, heights = c(3, 1))
+
+ggsave("OS all.png", plot = combined_plot, width = 10, height = 8, device = ragg::agg_png)
+ggsave("OS all.svg", plot = combined_plot, width = 10, height = 8, device = "svg")
+ggsave("OS all.pdf", plot = combined_plot, width = 10, height = 8, device = cairo_pdf)
+
+
+#subgroup Her 2+ vs. 3+ OS
+
+OSher23 <- survfit(survdatentd ~ label, data = daten1)
+summary(OSher23)$table
+
+os <- ggsurvplot(
+  OSher23, 
+  data = daten1,
+  pval = TRUE,
+  conf.int = FALSE,
+  risk.table = TRUE,
+  break.time.by = 3, 
+  xlab = "time, months",   
+  ylab = "Overall survival",  
+  break.y.by = 0.2,
+  legend.title = "",
+  legend.labs = c("HER2 ++", "HER2 +++")
+)
+
+combined_plot <- grid.arrange(os$plot, os$table, ncol = 1, heights = c(3, 1))
+
+ggsave("OS HER2.png", plot = combined_plot, width = 10, height = 8, device = ragg::agg_png)
+ggsave("OS HER2.svg", plot = combined_plot, width = 10, height = 8, device = "svg")
+ggsave("OS HER2.pdf", plot = combined_plot, width = 10, height = 8, device = cairo_pdf)
+
+
